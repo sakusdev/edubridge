@@ -8,6 +8,15 @@ import java.lang.reflect.InvocationTargetException;
 public final class GeyserEduGateFabricMod implements ModInitializer {
     @Override
     public void onInitialize() {
+        String minecraftVersion = minecraftVersion();
+        if (minecraftVersion.startsWith("26.")) {
+            System.err.println("[GeyserEdu] Minecraft Education/Fabric runtime " + minecraftVersion + " detected.");
+            System.err.println("[GeyserEdu] The 1.21.4 Fabric runtime is disabled before loading because this runtime uses different Minecraft mappings.");
+            logRuntimeProbe();
+            System.err.println("[GeyserEdu] Server startup will continue. /edu-session is not available on this runtime until an Education 26.x adapter is implemented.");
+            return;
+        }
+
         try {
             Class<?> runtimeClass = Class.forName("dev.sakus.geyseredu.fabric.GeyserEduGateFabricRuntime");
             Object runtime = runtimeClass.getConstructor().newInstance();
@@ -22,9 +31,7 @@ public final class GeyserEduGateFabricMod implements ModInitializer {
     private static void handleStartupFailure(Throwable failure) {
         if (isMinecraftLinkageFailure(failure)) {
             System.err.println("[GeyserEdu] Fabric runtime was not enabled because this Minecraft runtime does not expose the 1.21.4 Fabric/Yarn classes used by the mod.");
-            System.err.println("[GeyserEdu] Detected Minecraft version: " + FabricLoader.getInstance().getModContainer("minecraft")
-                .map(container -> container.getMetadata().getVersion().getFriendlyString())
-                .orElse("unknown"));
+            System.err.println("[GeyserEdu] Detected Minecraft version: " + minecraftVersion());
             logRuntimeProbe();
             System.err.println("[GeyserEdu] Use the Paper plugin path for now, or provide the full Education Fabric mappings/logs so an Education-specific adapter can be built.");
             System.err.println("[GeyserEdu] Startup compatibility detail: " + failure);
@@ -52,6 +59,12 @@ public final class GeyserEduGateFabricMod implements ModInitializer {
             current = current.getCause();
         }
         return false;
+    }
+
+    private static String minecraftVersion() {
+        return FabricLoader.getInstance().getModContainer("minecraft")
+            .map(container -> container.getMetadata().getVersion().getFriendlyString())
+            .orElse("unknown");
     }
 
     private static void logRuntimeProbe() {

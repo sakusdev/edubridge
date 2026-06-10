@@ -16,10 +16,10 @@
   "depends": {
     "fabricloader": ">=0.16.10",
     "minecraft": ">=1.21.4",
-    "fabric-api": "*",
     "java": ">=21"
   },
   "suggests": {
+    "fabric-api": "*",
     "floodgate": "*",
     "geyser-fabric": "*"
   }
