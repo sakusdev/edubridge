@@ -34,6 +34,7 @@ public final class AuthServiceMain {
     private final AuditLogger auditLogger;
     private final RateLimiter verifyRateLimiter;
     private final Map<String, Instant> states = new ConcurrentHashMap<>();
+    private final Map<String, PendingDeviceLogin> pendingDeviceLogins = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
     private final boolean ready;
     private final String readinessMessage;
@@ -81,6 +82,8 @@ public final class AuthServiceMain {
         server.createContext("/health/ready", this::healthReady);
         server.createContext("/login", this::login);
         server.createContext("/callback", this::callback);
+        server.createContext("/api/device/start", this::deviceStart);
+        server.createContext("/api/device/poll", this::devicePoll);
         server.createContext("/api/participation/verify", this::verify);
         server.createContext("/api/admin/participation/revoke", this::revoke);
         server.createContext("/api/admin/participation/list", this::listTickets);
@@ -223,6 +226,145 @@ public final class AuthServiceMain {
             + "}");
     }
 
+    private void deviceStart(HttpExchange exchange) throws IOException {
+        if (!ready) {
+            sendJson(exchange, 503, "{\"started\":false,\"message\":\"service is not ready\"}");
+            return;
+        }
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            sendJson(exchange, 405, "{\"started\":false,\"message\":\"method not allowed\"}");
+            return;
+        }
+        if (!verifyAuthorized(exchange)) {
+            sendJson(exchange, 401, "{\"started\":false,\"message\":\"unauthorized\"}");
+            return;
+        }
+
+        String body;
+        try {
+            body = readBody(exchange);
+        } catch (RequestBodyTooLargeException ex) {
+            sendJson(exchange, 413, "{\"started\":false,\"message\":\"request body too large\"}");
+            return;
+        }
+        String playerUuid = JsonUtil.stringField(body, "playerUuid").orElse("");
+        String playerName = JsonUtil.stringField(body, "playerName").orElse("");
+        String platform = JsonUtil.stringField(body, "platform").orElse("");
+        if (playerUuid.isBlank()) {
+            sendJson(exchange, 400, "{\"started\":false,\"message\":\"playerUuid is required\"}");
+            return;
+        }
+        String rateKey = remoteAddress(exchange) + ":" + playerUuid + ":device-start";
+        if (!verifyRateLimiter.allow(rateKey)) {
+            auditLogger.log("device.rate_limited", playerUuid, "", remoteAddress(exchange));
+            sendJson(exchange, 429, "{\"started\":false,\"message\":\"rate limited\"}");
+            return;
+        }
+
+        pruneDeviceLogins();
+        try {
+            DeviceAuthorization authorization = oauthClient.startDeviceAuthorization();
+            String requestId = randomToken();
+            PendingDeviceLogin pending = new PendingDeviceLogin(
+                requestId,
+                authorization.deviceCode(),
+                authorization.userCode(),
+                authorization.verificationUri(),
+                authorization.expiresAt(),
+                authorization.intervalSeconds(),
+                playerUuid,
+                playerName,
+                platform,
+                Instant.EPOCH
+            );
+            pendingDeviceLogins.put(requestId, pending);
+            auditLogger.log("device.start", playerUuid, "", authorization.userCode());
+            sendJson(exchange, 200, "{"
+                + "\"started\":true,"
+                + "\"requestId\":" + JsonUtil.jsonString(requestId) + ","
+                + "\"userCode\":" + JsonUtil.jsonString(authorization.userCode()) + ","
+                + "\"verificationUri\":" + JsonUtil.jsonString(authorization.verificationUri()) + ","
+                + "\"expiresAt\":" + JsonUtil.jsonString(authorization.expiresAt().toString()) + ","
+                + "\"intervalSeconds\":" + authorization.intervalSeconds() + ","
+                + "\"message\":" + JsonUtil.jsonString(authorization.message())
+                + "}");
+        } catch (Exception ex) {
+            auditLogger.log("device.start_failure", playerUuid, "", ex.getMessage());
+            sendJson(exchange, 502, "{\"started\":false,\"message\":\"failed to start Microsoft device login\"}");
+        }
+    }
+
+    private void devicePoll(HttpExchange exchange) throws IOException {
+        if (!ready) {
+            sendJson(exchange, 503, "{\"status\":\"failed\",\"valid\":false,\"message\":\"service is not ready\"}");
+            return;
+        }
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            sendJson(exchange, 405, "{\"status\":\"failed\",\"valid\":false,\"message\":\"method not allowed\"}");
+            return;
+        }
+        if (!verifyAuthorized(exchange)) {
+            sendJson(exchange, 401, "{\"status\":\"failed\",\"valid\":false,\"message\":\"unauthorized\"}");
+            return;
+        }
+
+        String body;
+        try {
+            body = readBody(exchange);
+        } catch (RequestBodyTooLargeException ex) {
+            sendJson(exchange, 413, "{\"status\":\"failed\",\"valid\":false,\"message\":\"request body too large\"}");
+            return;
+        }
+        String requestId = JsonUtil.stringField(body, "requestId").orElse("");
+        String playerUuid = JsonUtil.stringField(body, "playerUuid").orElse("");
+        PendingDeviceLogin pending = pendingDeviceLogins.get(requestId);
+        if (pending == null || Instant.now().isAfter(pending.expiresAt())) {
+            pendingDeviceLogins.remove(requestId);
+            sendJson(exchange, 410, "{\"status\":\"expired\",\"valid\":false,\"message\":\"device login expired\"}");
+            return;
+        }
+        if (!pending.playerUuid().equals(playerUuid)) {
+            sendJson(exchange, 403, "{\"status\":\"failed\",\"valid\":false,\"message\":\"request does not belong to player\"}");
+            return;
+        }
+        if (Instant.now().isBefore(pending.nextPollAt())) {
+            sendJson(exchange, 202, "{\"status\":\"pending\",\"valid\":false,\"message\":\"authorization pending\"}");
+            return;
+        }
+
+        pendingDeviceLogins.put(requestId, pending.withNextPollAt(Instant.now().plusSeconds(pending.intervalSeconds())));
+        try {
+            String idToken = oauthClient.pollDeviceAuthorizationForIdToken(pending.deviceCode());
+            String payload = tokenValidator.validateAndReadPayload(idToken);
+            String tenantId = JsonUtil.stringField(payload, "tid").orElse("");
+            String subject = JsonUtil.stringField(payload, "oid")
+                .or(() -> JsonUtil.stringField(payload, "sub"))
+                .orElse("unknown");
+            pendingDeviceLogins.remove(requestId);
+            auditLogger.log("device.success", playerUuid, tenantId, subject);
+            sendJson(exchange, 200, "{"
+                + "\"status\":\"verified\","
+                + "\"valid\":true,"
+                + "\"tenantId\":" + JsonUtil.jsonString(tenantId) + ","
+                + "\"subject\":" + JsonUtil.jsonString(subject) + ","
+                + "\"expiresAt\":" + JsonUtil.jsonString(Instant.now().plus(config.participationTtl()).toString()) + ","
+                + "\"message\":\"verified\""
+                + "}");
+        } catch (OAuthClient.DeviceAuthorizationException ex) {
+            String error = ex.error();
+            if ("authorization_pending".equals(error) || "slow_down".equals(error)) {
+                sendJson(exchange, 202, "{\"status\":\"pending\",\"valid\":false,\"message\":" + JsonUtil.jsonString(error) + "}");
+                return;
+            }
+            pendingDeviceLogins.remove(requestId);
+            auditLogger.log("device.failure", playerUuid, "", error);
+            sendJson(exchange, 400, "{\"status\":\"failed\",\"valid\":false,\"message\":" + JsonUtil.jsonString(error) + "}");
+        } catch (Exception ex) {
+            auditLogger.log("device.failure", playerUuid, "", ex.getMessage());
+            sendJson(exchange, 502, "{\"status\":\"failed\",\"valid\":false,\"message\":\"failed to poll Microsoft device login\"}");
+        }
+    }
+
     private void revoke(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             sendJson(exchange, 405, "{\"revoked\":false,\"message\":\"method not allowed\"}");
@@ -290,6 +432,11 @@ public final class AuthServiceMain {
     private void pruneStates() {
         Instant now = Instant.now();
         states.entrySet().removeIf(entry -> !now.isBefore(entry.getValue()));
+    }
+
+    private void pruneDeviceLogins() {
+        Instant now = Instant.now();
+        pendingDeviceLogins.entrySet().removeIf(entry -> now.isAfter(entry.getValue().expiresAt()));
     }
 
     private static Map<String, String> query(URI uri) {

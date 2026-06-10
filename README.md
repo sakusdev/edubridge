@@ -52,6 +52,8 @@ Geyser/Floodgate と併用する `GeyserEduGate` を、Paper プラグインと 
 
 `auth-service` は Microsoft Entra ID でログインしたユーザーへ参加 ID を発行します。参加 ID は Minecraft Education クライアントのチャットへ入力し、Paper/Fabric 側が検証 API へ問い合わせます。
 
+Paper では Microsoft device code flow も利用できます。この方式では参加 ID を手入力せず、サーバー参加時に表示されたコードを Microsoft の verification URL、通常は `https://microsoft.com/link`、で入力し、学校アカウントでログインします。auth-service が Microsoft の token endpoint をポーリングし、完了後にプレイヤーを許可します。
+
 必要な Entra ID アプリ設定:
 
 - Platform: Web
@@ -90,6 +92,10 @@ auth-service:
   verify-url: "http://127.0.0.1:8080/api/participation/verify"
   bearer-token: "shared-server-token"
   timeout-millis: 5000
+  device-code:
+    enabled: true
+    start-url: "http://127.0.0.1:8080/api/device/start"
+    poll-url: "http://127.0.0.1:8080/api/device/poll"
 ```
 
 現在の `auth-service` は OAuth code exchange 後に Microsoft OpenID metadata / JWKS を取得し、ID token の RS256 署名、`aud`、`iss`、`tid`、`exp` を検証します。参加 ID は `GEYSER_EDU_PARTICIPATION_ID_HASH_SECRET` で HMAC-SHA256 ハッシュ化して保存され、検証成功時に一回限りで消費されます。平文の参加 ID は発行画面に一度だけ表示されます。

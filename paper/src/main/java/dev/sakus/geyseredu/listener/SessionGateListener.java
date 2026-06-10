@@ -5,6 +5,7 @@ import dev.sakus.geyseredu.common.compat.CompatibilityDecision;
 import dev.sakus.geyseredu.common.compat.CompatibilityPolicy;
 import dev.sakus.geyseredu.common.compat.EducationCompatLayer;
 import dev.sakus.geyseredu.common.auth.ParticipationVerificationRequest;
+import dev.sakus.geyseredu.common.auth.RemoteDeviceCodeClient;
 import dev.sakus.geyseredu.common.auth.RemoteParticipationVerifier;
 import dev.sakus.geyseredu.floodgate.FloodgateDetector;
 import dev.sakus.geyseredu.session.SessionStore;
@@ -52,7 +53,12 @@ public final class SessionGateListener implements Listener {
         int graceSeconds = plugin.getConfig().getInt("sessions.join-grace-seconds", 45);
         String prefix = plugin.getConfig().getString("message-prefix", "[GeyserEdu]");
         pendingPlayers.add(player.getUniqueId());
-        player.sendMessage(ChatColor.YELLOW + prefix + " 参加IDをチャットに入力してください。入力した参加IDは他のプレイヤーには表示されません。");
+        if (deviceCodeEnabled()) {
+            player.sendMessage(ChatColor.YELLOW + prefix + " Microsoft のログインコードを発行しています...");
+            startDeviceCodeLogin(player);
+        } else {
+            player.sendMessage(ChatColor.YELLOW + prefix + " 参加IDをチャットに入力してください。入力した参加IDは他のプレイヤーには表示されません。");
+        }
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || player.hasPermission("geyseredu.bypass")) {
@@ -98,6 +104,97 @@ public final class SessionGateListener implements Listener {
 
         player.sendMessage(ChatColor.GRAY + prefix + " 参加IDを確認中です...");
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> verifyRemote(player.getUniqueId(), player.getName(), participationId));
+    }
+
+    private void startDeviceCodeLogin(Player player) {
+        UUID playerId = player.getUniqueId();
+        String playerName = player.getName();
+        String prefix = plugin.getConfig().getString("message-prefix", "[GeyserEdu]");
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                RemoteDeviceCodeClient client = deviceCodeClient();
+                var result = client.start(playerId.toString(), playerName, "paper");
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player current = Bukkit.getPlayer(playerId);
+                    if (current == null || !current.isOnline() || !pendingPlayers.contains(playerId)) {
+                        return;
+                    }
+                    if (!result.started()) {
+                        current.sendMessage(ChatColor.RED + prefix + " Microsoft ログインコードを発行できません: " + result.message());
+                        return;
+                    }
+                    current.sendMessage(ChatColor.AQUA + prefix + " " + result.verificationUri() + " を開いてください。");
+                    current.sendMessage(ChatColor.AQUA + prefix + " コード: " + ChatColor.WHITE + result.userCode());
+                    current.sendMessage(ChatColor.GRAY + prefix + " ログイン完了を自動確認しています...");
+                    scheduleDevicePoll(playerId, result.requestId(), Math.max(5, result.intervalSeconds()));
+                });
+            } catch (Exception ex) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player current = Bukkit.getPlayer(playerId);
+                    if (current != null && current.isOnline() && pendingPlayers.contains(playerId)) {
+                        current.sendMessage(ChatColor.RED + prefix + " auth-service に接続できません: " + ex.getMessage());
+                    }
+                });
+            }
+        });
+    }
+
+    private void scheduleDevicePoll(UUID playerId, String requestId, int intervalSeconds) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline() || !pendingPlayers.contains(playerId)) {
+                return;
+            }
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> pollDeviceLogin(playerId, requestId, intervalSeconds));
+        }, Math.max(5, intervalSeconds) * 20L);
+    }
+
+    private void pollDeviceLogin(UUID playerId, String requestId, int intervalSeconds) {
+        String prefix = plugin.getConfig().getString("message-prefix", "[GeyserEdu]");
+        try {
+            var result = deviceCodeClient().poll(requestId, playerId.toString());
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player == null || !player.isOnline() || !pendingPlayers.contains(playerId)) {
+                    return;
+                }
+                if (result.valid() && isTenantAllowed(result.tenantId())) {
+                    Instant expiresAt = result.expiresAt().orElseGet(() -> Instant.now().plusSeconds(3600));
+                    sessionStore.grantRemote(requestId, result.tenantId(), result.subject(), expiresAt, playerId);
+                    pendingPlayers.remove(playerId);
+                    player.sendMessage(ChatColor.GREEN + prefix + " Microsoft ログインを確認しました。");
+                    return;
+                }
+                if ("pending".equals(result.status())) {
+                    scheduleDevicePoll(playerId, requestId, intervalSeconds);
+                    return;
+                }
+                player.sendMessage(ChatColor.RED + prefix + " Microsoft ログインを確認できません: " + result.message());
+            });
+        } catch (Exception ex) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && player.isOnline() && pendingPlayers.contains(playerId)) {
+                    player.sendMessage(ChatColor.RED + prefix + " auth-service に接続できません: " + ex.getMessage());
+                    scheduleDevicePoll(playerId, requestId, intervalSeconds);
+                }
+            });
+        }
+    }
+
+    private boolean deviceCodeEnabled() {
+        return plugin.getConfig().getBoolean("auth-service.enabled", false)
+            && plugin.getConfig().getBoolean("auth-service.device-code.enabled", false);
+    }
+
+    private RemoteDeviceCodeClient deviceCodeClient() {
+        Duration timeout = Duration.ofMillis(plugin.getConfig().getLong("auth-service.timeout-millis", 5000));
+        return new RemoteDeviceCodeClient(
+            URI.create(plugin.getConfig().getString("auth-service.device-code.start-url", "")),
+            URI.create(plugin.getConfig().getString("auth-service.device-code.poll-url", "")),
+            plugin.getConfig().getString("auth-service.bearer-token", ""),
+            timeout
+        );
     }
 
     private void verifyRemote(UUID playerId, String playerName, String participationId) {

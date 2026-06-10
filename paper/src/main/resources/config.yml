@@ -53,3 +53,7 @@ auth-service:
   verify-url: "http://127.0.0.1:8080/api/participation/verify"
   bearer-token: ""
   timeout-millis: 5000
+  device-code:
+    enabled: true
+    start-url: "http://127.0.0.1:8080/api/device/start"
+    poll-url: "http://127.0.0.1:8080/api/device/poll"

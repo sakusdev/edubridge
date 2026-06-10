@@ -55,6 +55,10 @@ Recommended fields:
 
 The participation ID should be stored server-side. Clients should only receive the opaque ID, not signed Microsoft tokens.
 
+## Device Code Login
+
+Paper can also authorize players through Microsoft device code login. The game server requests `/api/device/start`, displays the returned `verificationUri` and `userCode` to the player, then polls `/api/device/poll`. auth-service owns the Microsoft `device_code`, validates the resulting ID token, checks the tenant, and returns a verified player session to the server.
+
 ## Tenant Sharing Rule
 
 When a user submits a participation ID, the service validates both the participation record and the joining user.
@@ -131,6 +135,8 @@ Endpoints:
 
 - `GET /login`: Redirects to Microsoft Entra ID.
 - `GET /callback`: Exchanges the authorization code, validates basic ID token claims, and issues a participation ID.
+- `POST /api/device/start`: Starts Microsoft device code login and returns the URL/code that the player should enter in a browser.
+- `POST /api/device/poll`: Polls Microsoft for device code completion and returns the verified tenant/user when complete.
 - `POST /api/participation/verify`: Verifies a participation ID for Paper/Fabric.
 - `POST /api/participation/revoke`: Revokes an unconsumed participation ID.
 

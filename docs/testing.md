@@ -116,6 +116,26 @@ http://127.0.0.1:8080/login
 
 After Microsoft login, the page displays a participation ID.
 
+### Device Code Login
+
+For the `microsoft.com/link` style flow, enable Paper device code mode:
+
+```yaml
+auth-service:
+  enabled: true
+  verify-url: "http://127.0.0.1:8080/api/participation/verify"
+  bearer-token: "shared-server-token"
+  timeout-millis: 5000
+  device-code:
+    enabled: true
+    start-url: "http://127.0.0.1:8080/api/device/start"
+    poll-url: "http://127.0.0.1:8080/api/device/poll"
+```
+
+When a gated player joins, the Paper plugin asks auth-service to start Microsoft device authorization. The player sees a URL and code in chat, signs in with the school account in a browser, and the plugin polls auth-service until the login is verified.
+
+Your Entra app registration must allow device code/public client authentication. If Microsoft returns an error from `/devicecode` or `/token`, check the app registration's public client flow setting and tenant policy.
+
 ### Configure Paper/Fabric Verifier
 
 Paper `plugins/GeyserEduGate/config.yml`:
