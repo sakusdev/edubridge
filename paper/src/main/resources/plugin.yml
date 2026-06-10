@@ -1,0 +1,19 @@
+name: GeyserEduGate
+version: 0.1.0
+main: dev.sakus.geyseredu.GeyserEduGatePlugin
+api-version: '1.21'
+author: sakus
+description: Tenant-scoped session gate for Minecraft Education players using Geyser/Floodgate.
+softdepend:
+  - floodgate
+commands:
+  edu-session:
+    description: Manage Education session access.
+    usage: /edu-session <reload|issue|revoke|list>
+permissions:
+  geyseredu.admin:
+    description: Allows managing Education session access.
+    default: op
+  geyseredu.bypass:
+    description: Allows joining without an Education session.
+    default: op

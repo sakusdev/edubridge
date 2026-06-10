@@ -1,0 +1,55 @@
+# Controls whether the plugin enforces session validation.
+enabled: true
+
+# Set to true when every Floodgate/Bedrock player must present a valid session.
+# Set to false if only explicitly detected Education users should be gated.
+require-session-for-all-floodgate-players: false
+
+# Prefix used in the kick message and command output.
+message-prefix: "[GeyserEdu]"
+
+# Participation IDs are opaque random strings. This local store is for development.
+# A later auth-service can replace this with an HTTP verifier backed by Entra ID.
+sessions:
+  default-ttl-minutes: 60
+  max-active-sessions: 1000
+  join-grace-seconds: 45
+
+# Detecting Minecraft Education specifically is not reliable at the Bukkit layer.
+# Use these prefixes as a conservative local policy, or require sessions for all
+# Floodgate players above.
+education-username-prefixes:
+  - "edu_"
+
+# Built-in Education compatibility policy. The Bukkit/Paper layer does not expose
+# exact Bedrock protocol metadata, so Geyser remains responsible for packet-level
+# translation while this plugin enforces policy before gameplay.
+education-compat:
+  enabled: true
+  deny-unknown-protocol: false
+  profiles:
+    - education-version: "1.21.133"
+      bedrock-base-range: "1.21.110-1.21.130"
+
+# Allowed tenant IDs. Empty allows local development sessions for any tenant.
+# Production Entra ID verification should set this explicitly.
+allowed-tenants: []
+
+# Optional fallback for local development. When enabled, admins can issue sessions from
+# the server without Microsoft Entra ID. Do not enable this on production servers.
+local-session-issuer:
+  enabled: true
+
+# Remote verifier for participation IDs issued after Microsoft Entra ID login.
+# Expected request:
+# POST verify-url
+# Authorization: Bearer <bearer-token>
+# {"participationId":"...","playerUuid":"...","playerName":"...","platform":"paper"}
+#
+# Expected success response:
+# {"valid":true,"tenantId":"...","subject":"...","expiresAt":"2026-06-09T00:00:00Z"}
+auth-service:
+  enabled: false
+  verify-url: "http://127.0.0.1:8080/api/participation/verify"
+  bearer-token: ""
+  timeout-millis: 5000
