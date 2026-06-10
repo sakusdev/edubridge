@@ -11,9 +11,9 @@ public final class GeyserEduGateFabricMod implements ModInitializer {
         String minecraftVersion = minecraftVersion();
         if (minecraftVersion.startsWith("26.")) {
             System.err.println("[GeyserEdu] Minecraft Education/Fabric runtime " + minecraftVersion + " detected.");
-            System.err.println("[GeyserEdu] The 1.21.4 Fabric runtime is disabled before loading because this runtime uses different Minecraft mappings.");
+            System.err.println("[GeyserEdu] Loading reflective Education 26.x adapter because this runtime uses different Minecraft mappings.");
             logRuntimeProbe();
-            System.err.println("[GeyserEdu] Server startup will continue. /edu-session is not available on this runtime until an Education 26.x adapter is implemented.");
+            new Education26ReflectiveAdapter().initialize();
             return;
         }
 
