@@ -54,6 +54,8 @@ Geyser/Floodgate と併用する `GeyserEduGate` を、Paper プラグインと 
 
 Paper では Microsoft device code flow も利用できます。この方式では参加 ID を手入力せず、サーバー参加時に表示されたコードを Microsoft の verification URL、通常は `https://microsoft.com/link`、で入力し、学校アカウントでログインします。auth-service が Microsoft の token endpoint をポーリングし、完了後にプレイヤーを許可します。
 
+Fabric の通常 runtime でも同じ device code flow を使えます。Minecraft Education 26.x runtime では mapping 差異があるため、現時点では反射 adapter の `/edu-session login` でコード発行と完了確認を行います。
+
 必要な Entra ID アプリ設定:
 
 - Platform: Web

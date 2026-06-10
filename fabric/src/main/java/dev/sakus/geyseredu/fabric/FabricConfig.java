@@ -63,8 +63,20 @@ public final class FabricConfig {
         return bool("auth-service.enabled", false);
     }
 
+    public boolean deviceCodeEnabled() {
+        return authServiceEnabled() && bool("auth-service.device-code.enabled", true);
+    }
+
     public String authServiceVerifyUrl() {
         return properties.getProperty("auth-service.verify-url", "");
+    }
+
+    public String authServiceDeviceStartUrl() {
+        return properties.getProperty("auth-service.device-code.start-url", "http://127.0.0.1:8080/api/device/start");
+    }
+
+    public String authServiceDevicePollUrl() {
+        return properties.getProperty("auth-service.device-code.poll-url", "http://127.0.0.1:8080/api/device/poll");
     }
 
     public String authServiceBearerToken() {
@@ -105,6 +117,9 @@ public final class FabricConfig {
         properties.putIfAbsent("local-session-issuer.enabled", "true");
         properties.putIfAbsent("auth-service.enabled", "false");
         properties.putIfAbsent("auth-service.verify-url", "http://127.0.0.1:8080/api/participation/verify");
+        properties.putIfAbsent("auth-service.device-code.enabled", "true");
+        properties.putIfAbsent("auth-service.device-code.start-url", "http://127.0.0.1:8080/api/device/start");
+        properties.putIfAbsent("auth-service.device-code.poll-url", "http://127.0.0.1:8080/api/device/poll");
         properties.putIfAbsent("auth-service.bearer-token", "");
         properties.putIfAbsent("auth-service.timeout-millis", "5000");
     }

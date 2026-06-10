@@ -6,6 +6,7 @@ import dev.sakus.geyseredu.common.compat.CompatibilityDecision;
 import dev.sakus.geyseredu.common.compat.CompatibilityPolicy;
 import dev.sakus.geyseredu.common.compat.EducationCompatLayer;
 import dev.sakus.geyseredu.common.auth.ParticipationVerificationRequest;
+import dev.sakus.geyseredu.common.auth.RemoteDeviceCodeClient;
 import dev.sakus.geyseredu.common.auth.RemoteParticipationVerifier;
 import dev.sakus.geyseredu.common.session.SessionRecord;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -55,8 +56,13 @@ public final class GeyserEduGateFabricRuntime {
                 return;
             }
 
-            player.sendMessage(Text.literal(PREFIX + "参加IDをチャットに入力してください。入力した参加IDは他のプレイヤーには表示されません。"));
             pendingDeadlines.put(player.getUuid(), ticks + Math.max(1, config.joinGraceSeconds()) * 20L);
+            if (config.deviceCodeEnabled()) {
+                player.sendMessage(Text.literal(PREFIX + "Microsoft のログインコードを発行しています..."));
+                startDeviceCodeLogin(player);
+            } else {
+                player.sendMessage(Text.literal(PREFIX + "参加IDをチャットに入力してください。入力した参加IDは他のプレイヤーには表示されません。"));
+            }
         });
     }
 
@@ -117,6 +123,8 @@ public final class GeyserEduGateFabricRuntime {
                 .then(literal("reload")
                     .requires(source -> source.hasPermissionLevel(3))
                     .executes(context -> reload(context.getSource())))
+                .then(literal("login")
+                    .executes(context -> login(context.getSource())))
         ));
     }
 
@@ -176,6 +184,94 @@ public final class GeyserEduGateFabricRuntime {
         }
     }
 
+    private void startDeviceCodeLogin(ServerPlayerEntity player) {
+        UUID playerId = player.getUuid();
+        String playerName = player.getGameProfile().getName();
+        var server = player.getServer();
+        CompletableFuture.runAsync(() -> {
+            try {
+                var result = deviceCodeClient().start(playerId.toString(), playerName, "fabric");
+                server.execute(() -> {
+                    ServerPlayerEntity current = server.getPlayerManager().getPlayer(playerId);
+                    if (current == null || !pendingDeadlines.containsKey(playerId)) {
+                        return;
+                    }
+                    if (!result.started()) {
+                        current.sendMessage(Text.literal(PREFIX + "Microsoft ログインコードを発行できません: " + result.message()));
+                        return;
+                    }
+                    current.sendMessage(Text.literal(PREFIX + result.verificationUri() + " を開いてください。"));
+                    current.sendMessage(Text.literal(PREFIX + "コード: " + result.userCode()));
+                    current.sendMessage(Text.literal(PREFIX + "ログイン完了を自動確認しています..."));
+                    scheduleDevicePoll(server, playerId, result.requestId(), Math.max(5, result.intervalSeconds()));
+                });
+            } catch (Exception ex) {
+                server.execute(() -> {
+                    ServerPlayerEntity current = server.getPlayerManager().getPlayer(playerId);
+                    if (current != null && pendingDeadlines.containsKey(playerId)) {
+                        current.sendMessage(Text.literal(PREFIX + "auth-service に接続できません: " + ex.getMessage()));
+                    }
+                });
+            }
+        });
+    }
+
+    private void scheduleDevicePoll(net.minecraft.server.MinecraftServer server, UUID playerId, String requestId, int intervalSeconds) {
+        long runAt = ticks + Math.max(5, intervalSeconds) * 20L;
+        CompletableFuture.runAsync(() -> {
+            while (ticks < runAt) {
+                try {
+                    Thread.sleep(250L);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            pollDeviceLogin(server, playerId, requestId, intervalSeconds);
+        });
+    }
+
+    private void pollDeviceLogin(net.minecraft.server.MinecraftServer server, UUID playerId, String requestId, int intervalSeconds) {
+        try {
+            var result = deviceCodeClient().poll(requestId, playerId.toString());
+            server.execute(() -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+                if (player == null || !pendingDeadlines.containsKey(playerId)) {
+                    return;
+                }
+                if (result.valid() && isTenantAllowed(result.tenantId())) {
+                    Instant expiresAt = result.expiresAt().orElseGet(() -> Instant.now().plusSeconds(3600));
+                    sessionStore.grantRemote(requestId, result.tenantId(), result.subject(), expiresAt, playerId);
+                    pendingDeadlines.remove(playerId);
+                    player.sendMessage(Text.literal(PREFIX + "Microsoft ログインを確認しました。"));
+                    return;
+                }
+                if ("pending".equals(result.status())) {
+                    scheduleDevicePoll(server, playerId, requestId, intervalSeconds);
+                    return;
+                }
+                player.sendMessage(Text.literal(PREFIX + "Microsoft ログインを確認できません: " + result.message()));
+            });
+        } catch (Exception ex) {
+            server.execute(() -> {
+                ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+                if (player != null && pendingDeadlines.containsKey(playerId)) {
+                    player.sendMessage(Text.literal(PREFIX + "auth-service に接続できません: " + ex.getMessage()));
+                    scheduleDevicePoll(server, playerId, requestId, intervalSeconds);
+                }
+            });
+        }
+    }
+
+    private RemoteDeviceCodeClient deviceCodeClient() {
+        return new RemoteDeviceCodeClient(
+            URI.create(config.authServiceDeviceStartUrl()),
+            URI.create(config.authServiceDevicePollUrl()),
+            config.authServiceBearerToken(),
+            Duration.ofMillis(config.authServiceTimeoutMillis())
+        );
+    }
+
     private int issue(ServerCommandSource source, String tenantId, long ttlMinutes) {
         if (!config.localSessionIssuerEnabled()) {
             source.sendError(Text.literal(PREFIX + "ローカルセッション発行は無効です。"));
@@ -225,6 +321,19 @@ public final class GeyserEduGateFabricRuntime {
     private int reload(ServerCommandSource source) {
         config.load();
         source.sendFeedback(() -> Text.literal(PREFIX + "設定を再読み込みしました。"), false);
+        return 1;
+    }
+
+    private int login(ServerCommandSource source) {
+        ServerPlayerEntity player;
+        try {
+            player = source.getPlayerOrThrow();
+        } catch (Exception ex) {
+            source.sendError(Text.literal(PREFIX + "このコマンドはプレイヤーから実行してください。"));
+            return 0;
+        }
+        pendingDeadlines.put(player.getUuid(), ticks + Math.max(1, config.joinGraceSeconds()) * 20L);
+        startDeviceCodeLogin(player);
         return 1;
     }
 

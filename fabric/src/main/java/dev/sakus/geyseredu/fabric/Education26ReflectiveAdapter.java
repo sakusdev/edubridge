@@ -3,15 +3,19 @@ package dev.sakus.geyseredu.fabric;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import dev.sakus.geyseredu.common.auth.RemoteDeviceCodeClient;
 import dev.sakus.geyseredu.common.session.SessionRecord;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import static com.mojang.brigadier.builder.RequiredArgumentBuilder.argument;
@@ -78,7 +82,9 @@ public final class Education26ReflectiveAdapter {
                 .then(argument("participationId", StringArgumentType.word())
                     .executes(context -> revoke((CommandContext<?>) context, StringArgumentType.getString(context, "participationId")))))
             .then(LiteralArgumentBuilder.literal("reload")
-                .executes(context -> reload((CommandContext<?>) context)));
+                .executes(context -> reload((CommandContext<?>) context)))
+            .then(LiteralArgumentBuilder.literal("login")
+                .executes(context -> login((CommandContext<?>) context)));
 
         dispatcher.getClass().getMethod("register", LiteralArgumentBuilder.class).invoke(dispatcher, root);
     }
@@ -143,6 +149,61 @@ public final class Education26ReflectiveAdapter {
         return 1;
     }
 
+    private int login(CommandContext<?> context) {
+        Object source = context.getSource();
+        if (!config.authServiceEnabled() || !config.deviceCodeEnabled()) {
+            sendError(source, PREFIX + "auth-service device-code が無効です。config/geyser-edu-gate.properties を確認してください。");
+            return 0;
+        }
+
+        String playerName = sourceName(source);
+        String playerUuid = sourceUuid(source);
+        sendFeedback(source, PREFIX + "Microsoft のログインコードを発行しています...");
+        CompletableFuture.runAsync(() -> runDeviceLogin(source, playerUuid, playerName));
+        return 1;
+    }
+
+    private void runDeviceLogin(Object source, String playerUuid, String playerName) {
+        try {
+            RemoteDeviceCodeClient client = deviceCodeClient();
+            var start = client.start(playerUuid, playerName, "fabric-education-26");
+            if (!start.started()) {
+                sendError(source, PREFIX + "Microsoft ログインコードを発行できません: " + start.message());
+                return;
+            }
+
+            sendFeedback(source, PREFIX + start.verificationUri() + " を開いてください。");
+            sendFeedback(source, PREFIX + "コード: " + start.userCode());
+            sendFeedback(source, PREFIX + "ログイン完了を自動確認しています...");
+
+            int intervalSeconds = Math.max(5, start.intervalSeconds());
+            while (Instant.now().isBefore(start.expiresAt())) {
+                sleep(intervalSeconds);
+                var status = client.poll(start.requestId(), playerUuid);
+                if (status.valid() && isTenantAllowed(status.tenantId())) {
+                    sendFeedback(source, PREFIX + "Microsoft ログインを確認しました。tenant=" + status.tenantId());
+                    return;
+                }
+                if (!"pending".equals(status.status())) {
+                    sendError(source, PREFIX + "Microsoft ログインを確認できません: " + status.message());
+                    return;
+                }
+            }
+            sendError(source, PREFIX + "Microsoft ログインコードの有効期限が切れました。");
+        } catch (Exception ex) {
+            sendError(source, PREFIX + "auth-service に接続できません: " + ex.getMessage());
+        }
+    }
+
+    private RemoteDeviceCodeClient deviceCodeClient() {
+        return new RemoteDeviceCodeClient(
+            URI.create(config.authServiceDeviceStartUrl()),
+            URI.create(config.authServiceDevicePollUrl()),
+            config.authServiceBearerToken(),
+            Duration.ofMillis(config.authServiceTimeoutMillis())
+        );
+    }
+
     private boolean isTenantAllowed(String tenantId) {
         if (config.allowedTenants().isEmpty()) {
             return true;
@@ -174,6 +235,55 @@ public final class Education26ReflectiveAdapter {
             }
         }
         return "unknown";
+    }
+
+    private static String sourceUuid(Object source) {
+        Object player = sourcePlayer(source);
+        if (player != null) {
+            for (String methodName : new String[]{"getUuid", "getUUID", "getUniqueId"}) {
+                try {
+                    Object value = player.getClass().getMethod(methodName).invoke(player);
+                    if (value != null) {
+                        return value.toString();
+                    }
+                } catch (ReflectiveOperationException ignored) {
+                }
+            }
+            Object profile = invokeNoArg(player, "getGameProfile");
+            if (profile != null) {
+                Object id = invokeNoArg(profile, "getId");
+                if (id != null) {
+                    return id.toString();
+                }
+            }
+        }
+        return UUID.nameUUIDFromBytes(sourceName(source).getBytes()).toString();
+    }
+
+    private static Object sourcePlayer(Object source) {
+        for (String methodName : new String[]{"getPlayer", "getPlayerOrThrow", "getPlayerOrException", "getEntity"}) {
+            Object value = invokeNoArg(source, methodName);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static Object invokeNoArg(Object target, String methodName) {
+        try {
+            return target.getClass().getMethod(methodName).invoke(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private static void sleep(int seconds) {
+        try {
+            Thread.sleep(seconds * 1000L);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void sendFeedback(Object source, String message) {

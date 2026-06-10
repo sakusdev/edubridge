@@ -162,9 +162,14 @@ auth-service.enabled=true
 auth-service.verify-url=http://127.0.0.1:8080/api/participation/verify
 auth-service.bearer-token=shared-server-token
 auth-service.timeout-millis=5000
+auth-service.device-code.enabled=true
+auth-service.device-code.start-url=http://127.0.0.1:8080/api/device/start
+auth-service.device-code.poll-url=http://127.0.0.1:8080/api/device/poll
 ```
 
 Restart the Minecraft server, join through Geyser, and enter the participation ID in chat.
+
+On standard Fabric runtimes, device code mode shows the Microsoft login URL/code on join and polls auth-service automatically. On Minecraft Education 26.x runtimes, use `/edu-session login` to request a Microsoft login code through the reflective adapter while the full join/chat gate adapter is still being built.
 
 ## Admin Checks
 
