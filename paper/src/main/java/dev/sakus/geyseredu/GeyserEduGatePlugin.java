@@ -1,5 +1,6 @@
 package dev.sakus.geyseredu;
 
+import dev.sakus.geyseredu.auth.EmbeddedAuthService;
 import dev.sakus.geyseredu.command.EduSessionCommand;
 import dev.sakus.geyseredu.floodgate.FloodgateDetector;
 import dev.sakus.geyseredu.listener.SessionGateListener;
@@ -10,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class GeyserEduGatePlugin extends JavaPlugin {
     private SessionStore sessionStore;
     private FloodgateDetector floodgateDetector;
+    private EmbeddedAuthService embeddedAuthService;
 
     @Override
     public void onEnable() {
@@ -17,6 +19,8 @@ public final class GeyserEduGatePlugin extends JavaPlugin {
 
         this.sessionStore = new SessionStore(this);
         this.floodgateDetector = new FloodgateDetector(getLogger());
+        this.embeddedAuthService = new EmbeddedAuthService(this);
+        this.embeddedAuthService.startIfEnabled();
 
         var command = new EduSessionCommand(this, sessionStore);
         PluginCommand pluginCommand = getCommand("edu-session");
@@ -37,6 +41,9 @@ public final class GeyserEduGatePlugin extends JavaPlugin {
     public void onDisable() {
         if (sessionStore != null) {
             sessionStore.save();
+        }
+        if (embeddedAuthService != null) {
+            embeddedAuthService.stop();
         }
     }
 

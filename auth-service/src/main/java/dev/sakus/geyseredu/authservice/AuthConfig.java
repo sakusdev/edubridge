@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,25 +31,29 @@ public record AuthConfig(
     int port
 ) {
     public static AuthConfig fromEnv() {
+        return fromValues(Map.of());
+    }
+
+    public static AuthConfig fromValues(Map<String, String> values) {
         return new AuthConfig(
-            env("GEYSER_EDU_ENV", "development"),
-            env("GEYSER_EDU_CLIENT_ID", ""),
-            env("GEYSER_EDU_CLIENT_SECRET", ""),
-            env("GEYSER_EDU_TENANT", "organizations"),
-            URI.create(env("GEYSER_EDU_REDIRECT_URI", "http://127.0.0.1:8080/callback")),
-            csv(env("GEYSER_EDU_ALLOWED_TENANTS", "")),
-            env("GEYSER_EDU_VERIFY_BEARER_TOKEN", ""),
-            env("GEYSER_EDU_ADMIN_BEARER_TOKEN", ""),
-            env("GEYSER_EDU_PARTICIPATION_ID_HASH_SECRET", ""),
-            Duration.ofMinutes(Long.parseLong(env("GEYSER_EDU_PARTICIPATION_TTL_MINUTES", "10"))),
-            env("GEYSER_EDU_STORE_BACKEND", "file"),
-            Path.of(env("GEYSER_EDU_TICKET_STORE", "data/participation-tickets.tsv")),
-            env("GEYSER_EDU_POSTGRES_JDBC_URL", "jdbc:postgresql://postgres:5432/geyser_edu"),
-            env("GEYSER_EDU_POSTGRES_USERNAME", "geyser_edu"),
-            env("GEYSER_EDU_POSTGRES_PASSWORD", ""),
-            Path.of(env("GEYSER_EDU_AUDIT_LOG", "logs/audit.tsv")),
-            Integer.parseInt(env("GEYSER_EDU_VERIFY_RATE_LIMIT_PER_MINUTE", "60")),
-            Integer.parseInt(env("GEYSER_EDU_AUTH_PORT", "8080"))
+            value(values, "GEYSER_EDU_ENV", "development"),
+            value(values, "GEYSER_EDU_CLIENT_ID", ""),
+            value(values, "GEYSER_EDU_CLIENT_SECRET", ""),
+            value(values, "GEYSER_EDU_TENANT", "organizations"),
+            URI.create(value(values, "GEYSER_EDU_REDIRECT_URI", "http://127.0.0.1:8080/callback")),
+            csv(value(values, "GEYSER_EDU_ALLOWED_TENANTS", "")),
+            value(values, "GEYSER_EDU_VERIFY_BEARER_TOKEN", ""),
+            value(values, "GEYSER_EDU_ADMIN_BEARER_TOKEN", ""),
+            value(values, "GEYSER_EDU_PARTICIPATION_ID_HASH_SECRET", ""),
+            Duration.ofMinutes(Long.parseLong(value(values, "GEYSER_EDU_PARTICIPATION_TTL_MINUTES", "10"))),
+            value(values, "GEYSER_EDU_STORE_BACKEND", "file"),
+            Path.of(value(values, "GEYSER_EDU_TICKET_STORE", "data/participation-tickets.tsv")),
+            value(values, "GEYSER_EDU_POSTGRES_JDBC_URL", "jdbc:postgresql://postgres:5432/geyser_edu"),
+            value(values, "GEYSER_EDU_POSTGRES_USERNAME", "geyser_edu"),
+            value(values, "GEYSER_EDU_POSTGRES_PASSWORD", ""),
+            Path.of(value(values, "GEYSER_EDU_AUDIT_LOG", "logs/audit.tsv")),
+            Integer.parseInt(value(values, "GEYSER_EDU_VERIFY_RATE_LIMIT_PER_MINUTE", "60")),
+            Integer.parseInt(value(values, "GEYSER_EDU_AUTH_PORT", "8080"))
         );
     }
 
@@ -118,6 +123,11 @@ public record AuthConfig(
     private static String env(String key, String fallback) {
         String value = System.getenv(key);
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static String value(Map<String, String> values, String key, String fallback) {
+        String configured = values.get(key);
+        return configured == null || configured.isBlank() ? env(key, fallback) : configured;
     }
 
     private static Set<String> csv(String value) {

@@ -13,7 +13,10 @@ dependencies {
     modImplementation("net.fabricmc.fabric-api:fabric-api:0.119.3+1.21.4")
 
     implementation(project(":common"))
+    implementation(project(":auth-service"))
     include(project(":common"))
+    include(project(":auth-service"))
+    include("org.postgresql:postgresql:42.7.7")
 }
 
 tasks.processResources {

@@ -11,6 +11,7 @@ import dev.sakus.geyseredu.common.auth.RemoteParticipationVerifier;
 import dev.sakus.geyseredu.common.session.SessionRecord;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.command.ServerCommandSource;
@@ -33,6 +34,7 @@ public final class GeyserEduGateFabricRuntime {
     private static final String PREFIX = "[GeyserEdu] ";
 
     private final FabricConfig config = new FabricConfig();
+    private final FabricEmbeddedAuthService embeddedAuthService = new FabricEmbeddedAuthService();
     private final FabricSessionStore sessionStore = new FabricSessionStore();
     private final FabricFloodgateDetector floodgateDetector = new FabricFloodgateDetector();
     private final Map<UUID, Long> pendingDeadlines = new HashMap<>();
@@ -40,10 +42,12 @@ public final class GeyserEduGateFabricRuntime {
 
     public void initialize() {
         config.load();
+        embeddedAuthService.startIfEnabled(config);
         registerJoinGate();
         registerParticipationInput();
         registerTickGate();
         registerCommands();
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> embeddedAuthService.stop());
     }
 
     private void registerJoinGate() {

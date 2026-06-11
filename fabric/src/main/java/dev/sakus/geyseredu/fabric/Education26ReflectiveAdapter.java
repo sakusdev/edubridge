@@ -24,10 +24,12 @@ public final class Education26ReflectiveAdapter {
     private static final String PREFIX = "[GeyserEdu] ";
 
     private final FabricConfig config = new FabricConfig();
+    private final FabricEmbeddedAuthService embeddedAuthService = new FabricEmbeddedAuthService();
     private final FabricSessionStore sessionStore = new FabricSessionStore();
 
     public void initialize() {
         config.load();
+        embeddedAuthService.startIfEnabled(config);
         registerCommands();
         System.err.println("[GeyserEdu] Education 26.x reflective adapter enabled. Join/chat gating is not active yet; local /edu-session commands are available.");
     }

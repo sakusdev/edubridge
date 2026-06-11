@@ -10,9 +10,8 @@ This guide is for trying the current build locally before production deployment.
 
 Artifacts:
 
-- Paper plugin: `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar`
-- Fabric mod: `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar`
-- Auth service single jar: `auth-service/build/libs/geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar`
+- Paper plugin with embedded auth-service: `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar`
+- Fabric mod with embedded auth-service: `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar`
 
 ## Option A: Fast Local Test Without Entra ID
 
@@ -126,6 +125,16 @@ auth-service:
   verify-url: "http://127.0.0.1:8080/api/participation/verify"
   bearer-token: "shared-server-token"
   timeout-millis: 5000
+  embedded:
+    enabled: true
+    port: 8080
+    client-id: "your-client-id"
+    client-secret: "your-client-secret"
+    tenant: "organizations"
+    redirect-uri: "http://127.0.0.1:8080/callback"
+    allowed-tenants:
+      - "your-tenant-id"
+    participation-id-hash-secret: "long-random-hash-secret-at-least-32-chars"
   device-code:
     enabled: true
     start-url: "http://127.0.0.1:8080/api/device/start"
@@ -159,6 +168,14 @@ Fabric `config/geyser-edu-gate.properties`:
 require-session-for-all-floodgate-players=true
 local-session-issuer.enabled=false
 auth-service.enabled=true
+auth-service.embedded.enabled=true
+auth-service.embedded.port=8080
+auth-service.embedded.client-id=your-client-id
+auth-service.embedded.client-secret=your-client-secret
+auth-service.embedded.tenant=organizations
+auth-service.embedded.redirect-uri=http://127.0.0.1:8080/callback
+auth-service.embedded.allowed-tenants=your-tenant-id
+auth-service.embedded.participation-id-hash-secret=long-random-hash-secret-at-least-32-chars
 auth-service.verify-url=http://127.0.0.1:8080/api/participation/verify
 auth-service.bearer-token=shared-server-token
 auth-service.timeout-millis=5000

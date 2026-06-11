@@ -8,17 +8,7 @@ This guide describes the production target for the current implementation.
 .\.gradle-local\gradle-8.14\bin\gradle.bat build :auth-service:standaloneJar
 ```
 
-The auth-service standalone artifact is:
-
-```text
-auth-service/build/libs/geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar
-```
-
-It can be started directly:
-
-```powershell
-java -jar auth-service\build\libs\geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar
-```
+Release artifacts are the Paper and Fabric jars. Both include the auth-service classes and can run an embedded auth-service when `auth-service.embedded.enabled=true`.
 
 ## Entra ID
 
