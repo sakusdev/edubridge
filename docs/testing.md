@@ -5,14 +5,14 @@ This guide is for trying the current build locally before production deployment.
 ## Build
 
 ```powershell
-.\.gradle-local\gradle-8.14\bin\gradle.bat build :auth-service:installDist
+.\.gradle-local\gradle-8.14\bin\gradle.bat build :auth-service:standaloneJar
 ```
 
 Artifacts:
 
 - Paper plugin: `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar`
 - Fabric mod: `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar`
-- Auth service: `auth-service/build/distributions/geyser-edu-auth-service-0.2.0-SNAPSHOT.zip`
+- Auth service single jar: `auth-service/build/libs/geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar`
 
 ## Option A: Fast Local Test Without Entra ID
 

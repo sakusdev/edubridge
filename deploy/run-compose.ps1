@@ -28,7 +28,7 @@ if (-not $SkipBuild) {
     }
     Push-Location $repoRoot
     try {
-        & $gradle build ":auth-service:installDist"
+        & $gradle build ":auth-service:standaloneJar"
     } finally {
         Pop-Location
     }

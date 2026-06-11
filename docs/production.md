@@ -5,7 +5,19 @@ This guide describes the production target for the current implementation.
 ## Build
 
 ```powershell
-.\.gradle-local\gradle-8.14\bin\gradle.bat build installDist
+.\.gradle-local\gradle-8.14\bin\gradle.bat build :auth-service:standaloneJar
+```
+
+The auth-service standalone artifact is:
+
+```text
+auth-service/build/libs/geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar
+```
+
+It can be started directly:
+
+```powershell
+java -jar auth-service\build\libs\geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar
 ```
 
 ## Entra ID

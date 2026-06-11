@@ -145,7 +145,7 @@ Java 21 が必要です。
 
 - Paper: `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar`
 - Fabric: `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar`
-- Auth service distribution: `auth-service/build/distributions/geyser-edu-auth-service-0.2.0-SNAPSHOT.zip`
+- Auth service single jar: `auth-service/build/libs/geyser-edu-auth-service-0.2.0-SNAPSHOT-standalone.jar`
 
 本番デプロイ手順は [docs/production.md](C:/Users/sakus/Documents/Minecraft-Geyser-for-edu/docs/production.md) にまとめています。
 テスト利用手順は [docs/testing.md](C:/Users/sakus/Documents/Minecraft-Geyser-for-edu/docs/testing.md) にまとめています。
