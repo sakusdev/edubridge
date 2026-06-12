@@ -103,6 +103,9 @@ public final class GeyserEduGateFabricRuntime {
     private void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
             literal("edu-session")
+                .executes(context -> status(context.getSource()))
+                .then(literal("status")
+                    .executes(context -> status(context.getSource())))
                 .then(literal("issue")
                     .requires(source -> source.hasPermissionLevel(3))
                     .then(argument("tenantId", StringArgumentType.word())
@@ -325,6 +328,11 @@ public final class GeyserEduGateFabricRuntime {
     private int reload(ServerCommandSource source) {
         config.load();
         source.sendFeedback(() -> Text.literal(PREFIX + "設定を再読み込みしました。"), false);
+        return 1;
+    }
+
+    private int status(ServerCommandSource source) {
+        source.sendFeedback(() -> Text.literal(PREFIX + "Fabric runtime is loaded. Use /edu-session login for Microsoft device code login."), false);
         return 1;
     }
 

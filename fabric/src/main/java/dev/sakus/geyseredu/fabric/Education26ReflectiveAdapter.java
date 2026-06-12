@@ -46,10 +46,13 @@ public final class Education26ReflectiveAdapter {
             );
             Method register = findSingleArgumentMethod(event.getClass(), "register");
             register.invoke(event, listener);
+            System.err.println("[GeyserEdu] Registered Education 26.x /edu-session command callback.");
         } catch (ClassNotFoundException ex) {
             System.err.println("[GeyserEdu] Fabric API command v2 is missing; /edu-session cannot be registered on Education 26.x.");
         } catch (ReflectiveOperationException ex) {
             System.err.println("[GeyserEdu] Failed to register Education 26.x reflective commands: " + ex);
+        } catch (Throwable ex) {
+            System.err.println("[GeyserEdu] Unexpected failure while registering Education 26.x commands: " + ex);
         }
     }
 
@@ -59,6 +62,7 @@ public final class Education26ReflectiveAdapter {
                 return null;
             }
             registerCommandTree(args[0]);
+            System.err.println("[GeyserEdu] Registered /edu-session command tree for Education 26.x.");
             return null;
         };
     }
