@@ -58,6 +58,8 @@ Fabric の通常 runtime でも同じ device code flow を使えます。Minecra
 
 Paper/Fabric の Release jar には auth-service 本体も同梱されています。`auth-service.embedded.enabled=true` にすると、別の auth-service 配布物を置かずに plugin/mod 内から HTTP auth-service を起動できます。
 
+Device code flow だけを使う場合、Entra app registration は public client flow を許可していれば `client-secret` なしで動かせます。`/login` と `/callback` の authorization-code flow も使う場合は client secret を設定してください。
+
 必要な Entra ID アプリ設定:
 
 - Platform: Web

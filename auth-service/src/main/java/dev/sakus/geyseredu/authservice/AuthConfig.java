@@ -70,9 +70,6 @@ public record AuthConfig(
         if (clientId.isBlank()) {
             errors.add("GEYSER_EDU_CLIENT_ID is required");
         }
-        if (clientSecret.isBlank()) {
-            errors.add("GEYSER_EDU_CLIENT_SECRET is required");
-        }
         if (tenant.isBlank()) {
             errors.add("GEYSER_EDU_TENANT is required");
         }

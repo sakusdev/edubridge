@@ -144,6 +144,7 @@ auth-service:
 When a gated player joins, the Paper plugin asks auth-service to start Microsoft device authorization. The player sees a URL and code in chat, signs in with the school account in a browser, and the plugin polls auth-service until the login is verified.
 
 Your Entra app registration must allow device code/public client authentication. If Microsoft returns an error from `/devicecode` or `/token`, check the app registration's public client flow setting and tenant policy.
+For device code only, `client-secret` can be left blank. Set it when also using the `/login` browser authorization-code flow.
 
 ### Configure Paper/Fabric Verifier
 

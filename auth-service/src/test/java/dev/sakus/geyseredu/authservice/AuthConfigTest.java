@@ -75,6 +75,32 @@ class AuthConfigTest {
         assertTrue(errors.contains("GEYSER_EDU_VERIFY_RATE_LIMIT_PER_MINUTE must be greater than zero"));
     }
 
+    @Test
+    void allowsDeviceCodeConfigurationWithoutClientSecret() {
+        AuthConfig config = new AuthConfig(
+            "development",
+            "client-id",
+            "",
+            "organizations",
+            URI.create("http://127.0.0.1:8080/callback"),
+            Set.of("tenant-a"),
+            "verify-token",
+            "",
+            "hash-secret",
+            Duration.ofMinutes(10),
+            "file",
+            Path.of("tickets.tsv"),
+            "",
+            "",
+            "",
+            Path.of("audit.tsv"),
+            60,
+            8080
+        );
+
+        assertTrue(config.validationErrors().isEmpty());
+    }
+
     private static AuthConfig config(
         String environment,
         String redirectUri,
