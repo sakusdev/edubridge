@@ -31,6 +31,7 @@ public final class Education26ReflectiveAdapter {
         config.load();
         embeddedAuthService.startIfEnabled(config);
         registerCommands();
+        registerServerStartingCommandFallback();
         System.err.println("[GeyserEdu] Education 26.x reflective adapter enabled. Join/chat gating is not active yet.");
     }
 
@@ -68,6 +69,40 @@ public final class Education26ReflectiveAdapter {
         };
     }
 
+    private void registerServerStartingCommandFallback() {
+        try {
+            Class<?> callbackClass = Class.forName("net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStarting");
+            Class<?> lifecycleClass = Class.forName("net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents");
+            Field eventField = lifecycleClass.getField("SERVER_STARTING");
+            Object event = eventField.get(null);
+            Object listener = Proxy.newProxyInstance(
+                callbackClass.getClassLoader(),
+                new Class<?>[]{callbackClass},
+                serverStartingHandler()
+            );
+            Class<?> eventClass = Class.forName("net.fabricmc.fabric.api.event.Event");
+            Method register = eventClass.getMethod("register", Object.class);
+            register.invoke(event, listener);
+            System.err.println("[GeyserEdu] Registered Education 26.x server-starting command fallback.");
+        } catch (ClassNotFoundException ex) {
+            System.err.println("[GeyserEdu] Fabric lifecycle API is missing; server-starting command fallback cannot be registered.");
+        } catch (ReflectiveOperationException ex) {
+            System.err.println("[GeyserEdu] Failed to register Education 26.x server-starting command fallback: " + ex);
+        } catch (Throwable ex) {
+            System.err.println("[GeyserEdu] Unexpected failure while registering Education 26.x command fallback: " + ex);
+        }
+    }
+
+    private InvocationHandler serverStartingHandler() {
+        return (proxy, method, args) -> {
+            if (args == null || args.length == 0) {
+                return null;
+            }
+            registerCommandTreeFromServer(args[0]);
+            return null;
+        };
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void registerCommandTree(Object dispatcher) throws ReflectiveOperationException {
         LiteralArgumentBuilder root = LiteralArgumentBuilder.literal("edu-session")
@@ -94,6 +129,19 @@ public final class Education26ReflectiveAdapter {
                 .executes(context -> login((CommandContext<?>) context)));
 
         dispatcher.getClass().getMethod("register", LiteralArgumentBuilder.class).invoke(dispatcher, root);
+    }
+
+    private void registerCommandTreeFromServer(Object server) {
+        try {
+            Object commands = server.getClass().getMethod("getCommands").invoke(server);
+            Object dispatcher = commands.getClass().getMethod("getDispatcher").invoke(commands);
+            registerCommandTree(dispatcher);
+            System.err.println("[GeyserEdu] Registered /edu-session command tree for Education 26.x through server dispatcher fallback.");
+        } catch (NoSuchMethodException ex) {
+            System.err.println("[GeyserEdu] Education 26.x server dispatcher methods were not found: " + ex.getMessage());
+        } catch (ReflectiveOperationException ex) {
+            System.err.println("[GeyserEdu] Failed to register /edu-session through Education 26.x server dispatcher fallback: " + ex);
+        }
     }
 
     private int status(CommandContext<?> context) {
