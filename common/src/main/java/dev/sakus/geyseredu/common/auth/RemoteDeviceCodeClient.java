@@ -42,7 +42,7 @@ public final class RemoteDeviceCodeClient {
             + "}";
         HttpResponse<String> response = send(startUri, body);
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            return DeviceCodeStartResult.failed("auth-service returned HTTP " + response.statusCode());
+            return DeviceCodeStartResult.failed(httpError(startUri, response));
         }
 
         String responseBody = response.body();
@@ -70,7 +70,7 @@ public final class RemoteDeviceCodeClient {
             return DeviceCodeStatusResult.pending(readString(response.body(), "message").orElse("authorization pending"));
         }
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            return DeviceCodeStatusResult.failed("auth-service returned HTTP " + response.statusCode());
+            return DeviceCodeStatusResult.failed(httpError(pollUri, response));
         }
 
         String responseBody = response.body();
@@ -101,6 +101,25 @@ public final class RemoteDeviceCodeClient {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static String httpError(URI uri, HttpResponse<String> response) {
+        String body = compact(response.body());
+        if (body.isBlank()) {
+            return "auth-service returned HTTP " + response.statusCode() + " from " + uri;
+        }
+        return "auth-service returned HTTP " + response.statusCode() + " from " + uri + ": " + body;
+    }
+
+    private static String compact(String value) {
+        if (value == null) {
+            return "";
+        }
+        String compacted = value.replace('\n', ' ').replace('\r', ' ').trim();
+        if (compacted.length() > 180) {
+            return compacted.substring(0, 180) + "...";
+        }
+        return compacted;
     }
 
     private static Optional<String> readString(String json, String field) {

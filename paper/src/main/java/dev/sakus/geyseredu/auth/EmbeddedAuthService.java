@@ -6,6 +6,8 @@ import dev.sakus.geyseredu.authservice.AuthServiceMain;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.net.BindException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,6 +16,7 @@ import java.util.logging.Level;
 public final class EmbeddedAuthService {
     private final JavaPlugin plugin;
     private HttpServer server;
+    private URI baseUri;
 
     public EmbeddedAuthService(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -29,20 +32,70 @@ public final class EmbeddedAuthService {
         }
 
         try {
-            AuthConfig authConfig = AuthConfig.fromValues(values(config, plugin.getDataFolder().toPath()));
-            server = new AuthServiceMain(authConfig).startServer();
-            plugin.getLogger().info("Embedded auth-service listening on port " + authConfig.port() + ".");
+            Map<String, String> values = values(config, plugin.getDataFolder().toPath());
+            int configuredPort = Integer.parseInt(values.getOrDefault("GEYSER_EDU_AUTH_PORT", "8080"));
+            startOnAvailablePort(values, configuredPort);
         } catch (Exception ex) {
             plugin.getLogger().log(Level.SEVERE, "Failed to start embedded auth-service.", ex);
         }
+    }
+
+    public URI deviceStartUri(String fallback) {
+        if (baseUri != null) {
+            return baseUri.resolve("/api/device/start");
+        }
+        return URI.create(fallback);
+    }
+
+    public URI devicePollUri(String fallback) {
+        if (baseUri != null) {
+            return baseUri.resolve("/api/device/poll");
+        }
+        return URI.create(fallback);
     }
 
     public void stop() {
         if (server != null) {
             server.stop(0);
             server = null;
+            baseUri = null;
             plugin.getLogger().info("Embedded auth-service stopped.");
         }
+    }
+
+    private void startOnAvailablePort(Map<String, String> baseValues, int configuredPort) throws Exception {
+        Exception lastFailure = null;
+        for (int port : candidatePorts(configuredPort)) {
+            Map<String, String> values = new HashMap<>(baseValues);
+            values.put("GEYSER_EDU_AUTH_PORT", Integer.toString(port));
+            try {
+                AuthConfig authConfig = AuthConfig.fromValues(values);
+                server = new AuthServiceMain(authConfig).startServer();
+                int actualPort = server.getAddress().getPort();
+                baseUri = URI.create("http://127.0.0.1:" + actualPort + "/");
+                plugin.getLogger().info("Embedded auth-service listening on " + baseUri + ".");
+                if (actualPort != configuredPort) {
+                    plugin.getLogger().warning("Configured auth-service port " + configuredPort + " was unavailable; using " + actualPort + " for device-code requests.");
+                }
+                return;
+            } catch (BindException ex) {
+                lastFailure = ex;
+                plugin.getLogger().warning("Embedded auth-service port " + port + " is unavailable; trying another port.");
+            }
+        }
+        if (lastFailure != null) {
+            throw lastFailure;
+        }
+    }
+
+    private static int[] candidatePorts(int configuredPort) {
+        if (configuredPort <= 0) {
+            return new int[]{0};
+        }
+        if (configuredPort == 8080) {
+            return new int[]{8080, 18080, 18081, 0};
+        }
+        return new int[]{configuredPort, configuredPort + 1, 0};
     }
 
     private static Map<String, String> values(FileConfiguration config, Path dataDir) {

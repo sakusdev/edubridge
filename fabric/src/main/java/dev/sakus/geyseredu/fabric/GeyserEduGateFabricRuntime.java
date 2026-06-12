@@ -272,8 +272,8 @@ public final class GeyserEduGateFabricRuntime {
 
     private RemoteDeviceCodeClient deviceCodeClient() {
         return new RemoteDeviceCodeClient(
-            URI.create(config.authServiceDeviceStartUrl()),
-            URI.create(config.authServiceDevicePollUrl()),
+            embeddedAuthService.deviceStartUri(config.authServiceDeviceStartUrl()),
+            embeddedAuthService.devicePollUri(config.authServiceDevicePollUrl()),
             config.authServiceBearerToken(),
             Duration.ofMillis(config.authServiceTimeoutMillis())
         );

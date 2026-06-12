@@ -8,6 +8,7 @@ import dev.sakus.geyseredu.common.auth.ParticipationVerificationRequest;
 import dev.sakus.geyseredu.common.auth.RemoteDeviceCodeClient;
 import dev.sakus.geyseredu.common.auth.RemoteParticipationVerifier;
 import dev.sakus.geyseredu.floodgate.FloodgateDetector;
+import dev.sakus.geyseredu.auth.EmbeddedAuthService;
 import dev.sakus.geyseredu.session.SessionStore;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -29,12 +30,14 @@ public final class SessionGateListener implements Listener {
     private final JavaPlugin plugin;
     private final SessionStore sessionStore;
     private final FloodgateDetector floodgateDetector;
+    private final EmbeddedAuthService embeddedAuthService;
     private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
 
-    public SessionGateListener(JavaPlugin plugin, SessionStore sessionStore, FloodgateDetector floodgateDetector) {
+    public SessionGateListener(JavaPlugin plugin, SessionStore sessionStore, FloodgateDetector floodgateDetector, EmbeddedAuthService embeddedAuthService) {
         this.plugin = plugin;
         this.sessionStore = sessionStore;
         this.floodgateDetector = floodgateDetector;
+        this.embeddedAuthService = embeddedAuthService;
     }
 
     @EventHandler
@@ -190,8 +193,8 @@ public final class SessionGateListener implements Listener {
     private RemoteDeviceCodeClient deviceCodeClient() {
         Duration timeout = Duration.ofMillis(plugin.getConfig().getLong("auth-service.timeout-millis", 5000));
         return new RemoteDeviceCodeClient(
-            URI.create(plugin.getConfig().getString("auth-service.device-code.start-url", "")),
-            URI.create(plugin.getConfig().getString("auth-service.device-code.poll-url", "")),
+            embeddedAuthService.deviceStartUri(plugin.getConfig().getString("auth-service.device-code.start-url", "")),
+            embeddedAuthService.devicePollUri(plugin.getConfig().getString("auth-service.device-code.poll-url", "")),
             plugin.getConfig().getString("auth-service.bearer-token", ""),
             timeout
         );

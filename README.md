@@ -57,6 +57,7 @@ Paper では Microsoft device code flow も利用できます。この方式で�
 Fabric の通常 runtime でも同じ device code flow を使えます。Minecraft Education 26.x runtime では mapping 差異があるため、現時点では反射 adapter の `/edu-session login` でコード発行と完了確認を行います。
 
 Paper/Fabric の Release jar には auth-service 本体も同梱されています。`auth-service.enabled=true` のときは `auth-service.embedded.enabled=true` を使い、別の auth-service 配布物を置かずに plugin/mod 内から HTTP auth-service を起動します。
+内蔵 auth-service が 8080 を使えない場合は別の空きポートへ退避し、device code flow は実際に起動したローカル URL を使います。
 
 Device code flow だけを使う場合、Entra app registration は public client flow を許可していれば `client-secret` なしで動かせます。`/login` と `/callback` の authorization-code flow も使う場合は client secret を設定してください。
 
@@ -147,8 +148,8 @@ Java 21 が必要です。
 
 成果物:
 
-- Paper: `paper/build/libs/geyser-edu-gate-paper-0.1.3.jar`
-- Fabric: `fabric/build/libs/geyser-edu-gate-fabric-0.1.3.jar`
+- Paper: `paper/build/libs/geyser-edu-gate-paper-0.1.4.jar`
+- Fabric: `fabric/build/libs/geyser-edu-gate-fabric-0.1.4.jar`
 
 Paper/Fabric の jar は auth-service を同梱しています。Release ではこの 2 ファイルだけを配布します。
 

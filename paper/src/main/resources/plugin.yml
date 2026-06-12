@@ -1,5 +1,5 @@
 name: GeyserEduGate
-version: 0.1.3
+version: 0.1.4
 main: dev.sakus.geyseredu.GeyserEduGatePlugin
 api-version: '1.21'
 author: sakus

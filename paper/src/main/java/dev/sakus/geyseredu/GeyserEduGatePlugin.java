@@ -30,7 +30,7 @@ public final class GeyserEduGatePlugin extends JavaPlugin {
         }
 
         getServer().getPluginManager().registerEvents(
-            new SessionGateListener(this, sessionStore, floodgateDetector),
+            new SessionGateListener(this, sessionStore, floodgateDetector, embeddedAuthService),
             this
         );
 
