@@ -31,7 +31,7 @@ public final class Education26ReflectiveAdapter {
         config.load();
         embeddedAuthService.startIfEnabled(config);
         registerCommands();
-        System.err.println("[GeyserEdu] Education 26.x reflective adapter enabled. Join/chat gating is not active yet; local /edu-session commands are available.");
+        System.err.println("[GeyserEdu] Education 26.x reflective adapter enabled. Join/chat gating is not active yet.");
     }
 
     private void registerCommands() {
@@ -44,7 +44,8 @@ public final class Education26ReflectiveAdapter {
                 new Class<?>[]{callbackClass},
                 commandRegistrationHandler()
             );
-            Method register = findSingleArgumentMethod(event.getClass(), "register");
+            Class<?> eventClass = Class.forName("net.fabricmc.fabric.api.event.Event");
+            Method register = eventClass.getMethod("register", Object.class);
             register.invoke(event, listener);
             System.err.println("[GeyserEdu] Registered Education 26.x /edu-session command callback.");
         } catch (ClassNotFoundException ex) {
@@ -351,15 +352,6 @@ public final class Education26ReflectiveAdapter {
         } catch (ReflectiveOperationException ignored) {
         }
         return false;
-    }
-
-    private static Method findSingleArgumentMethod(Class<?> type, String name) throws NoSuchMethodException {
-        for (Method method : type.getMethods()) {
-            if (method.getName().equals(name) && method.getParameterCount() == 1) {
-                return method;
-            }
-        }
-        throw new NoSuchMethodException(type.getName() + "." + name);
     }
 
     private static Method findMethod(Class<?> type, String name, Class<?>... parameterTypes) {
