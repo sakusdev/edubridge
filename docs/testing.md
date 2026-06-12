@@ -10,8 +10,8 @@ This guide is for trying the current build locally before production deployment.
 
 Artifacts:
 
-- Paper plugin with embedded auth-service: `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar`
-- Fabric mod with embedded auth-service: `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar`
+- Paper plugin with embedded auth-service: `paper/build/libs/geyser-edu-gate-paper-0.1.3.jar`
+- Fabric mod with embedded auth-service: `fabric/build/libs/geyser-edu-gate-fabric-0.1.3.jar`
 
 ## Option A: Fast Local Test Without Entra ID
 
@@ -20,7 +20,7 @@ Use this first to confirm the Minecraft server gate works.
 ### Paper
 
 1. Install Geyser/Floodgate on your Paper server.
-2. Copy `paper/build/libs/geyser-edu-gate-paper-0.2.0-SNAPSHOT.jar` to the server `plugins` folder.
+2. Copy `paper/build/libs/geyser-edu-gate-paper-0.1.3.jar` to the server `plugins` folder.
 3. Start the server once, then edit `plugins/GeyserEduGate/config.yml`.
 4. For a simple test, set:
 
@@ -49,7 +49,7 @@ The ID message is intercepted and should not be broadcast to other players.
 ### Fabric
 
 1. Install Fabric server, Fabric API, Geyser/Floodgate if applicable.
-2. Copy `fabric/build/libs/geyser-edu-gate-fabric-0.2.0-SNAPSHOT.jar` to the server `mods` folder.
+2. Copy `fabric/build/libs/geyser-edu-gate-fabric-0.1.3.jar` to the server `mods` folder.
 3. Start once, then edit `config/geyser-edu-gate.properties`.
 4. For a simple test, set:
 

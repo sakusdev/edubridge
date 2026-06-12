@@ -70,7 +70,7 @@ public final class FabricConfig {
     }
 
     public boolean embeddedAuthServiceEnabled() {
-        return bool("auth-service.embedded.enabled", false);
+        return authServiceEnabled() && bool("auth-service.embedded.enabled", true);
     }
 
     public String authServiceVerifyUrl() {
@@ -146,7 +146,7 @@ public final class FabricConfig {
         properties.putIfAbsent("local-session-issuer.enabled", "true");
         properties.putIfAbsent("auth-service.enabled", "false");
         properties.putIfAbsent("auth-service.verify-url", "http://127.0.0.1:8080/api/participation/verify");
-        properties.putIfAbsent("auth-service.embedded.enabled", "false");
+        properties.putIfAbsent("auth-service.embedded.enabled", "true");
         properties.putIfAbsent("auth-service.embedded.environment", "development");
         properties.putIfAbsent("auth-service.embedded.port", "8080");
         properties.putIfAbsent("auth-service.embedded.client-id", "");

@@ -54,7 +54,7 @@ auth-service:
   bearer-token: ""
   timeout-millis: 5000
   embedded:
-    enabled: false
+    enabled: true
     environment: "development"
     port: 8080
     client-id: ""
